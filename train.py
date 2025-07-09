@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from torch import optim
 
 def train(model,train_Bdata,train_posdata, train_labels, test_Bdata,test_posdata, test_labels, config):
+    #该部分与pinn相似，故不再赘述
     Nep    = config['Nep']
     device = config['device']
     path   = config['path'] 
@@ -120,15 +121,17 @@ def train(model,train_Bdata,train_posdata, train_labels, test_Bdata,test_posdata
 
     return best_model
 def train_data_generation(train_Bdata,train_posdata,train_labels,config,model,randomization):
-    if(randomization==0):
+    # 目前只支持deeponet的随机采样
+    if(randomization==0 or config['model_type']=='DeepONet_Conv'):
+        #关闭随机采样时，一次只使用一种磁场配置的数据
         idx=np.random.randint(train_Bdata.size()[0])        
         train_posdata_slice=train_posdata[:,:,idx]
         train_labels_slice=train_labels[:,:,idx]
         #print(train_posdata_slice.size())
         if(config['model_type']=='DeepONet'):
             train_Bdata_slice=train_Bdata[idx,:]
+            #通过将探测器的位置与磁场数据也混入pos和labels中,增加训练数据的数量
             train_posdata_slice=torch.cat((train_posdata_slice,torch.tensor(model.probes_pos)),axis=0)
-            #print(train_posdata_slice.size())
             train_labels_slice=torch.cat((train_labels_slice,torch.reshape(train_Bdata_slice,(-1,3))),axis=0)
         elif(config['model_type']=='DeepONet_Conv'):
             train_Bdata_slice=train_Bdata[:,:,:,idx]
@@ -139,6 +142,7 @@ def train_data_generation(train_Bdata,train_posdata,train_labels,config,model,ra
                     a[:,j]=train_Bdata_slice[:,:,i*3+j].reshape(-1)
                 train_labels_slice=torch.cat((train_labels_slice,a),axis=0)
     else:
+        #idx1随机抽磁场配置，idx2随机抽训练点，举例来说，78号磁场的91号训练点和91号磁场的78号训练点可能一起被抽出来并放到一个batch内
         idx1=np.random.randint(0,train_Bdata.size()[0],config['sample'])
         idx2=np.random.randint(0,train_posdata.size()[0],config['sample'])
         train_Bdata_slice=train_Bdata[idx1,:]

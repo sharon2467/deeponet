@@ -2,6 +2,7 @@ import torch
 from data import *
 import matplotlib.pyplot as plt
 import time
+#eval与pinn基本相同，不再赘述
 def getdB(Bpred, Breal):
     Bx = Bpred[:,0].detach().numpy()
     By = Bpred[:,1].detach().numpy()
@@ -44,8 +45,10 @@ def Eval(model, config, field):
         phase=[1,1,1]
     else:
         phase=[0,0,0]
+    #temp_final是模拟磁场，model_output是模型预测的磁场
     temp_final=field.field_manager(inputs_np,field.order,field.order,phase,Btype,'I',config['radius1'],config['radius2'],config['a'],config['b'],config['dx'],config['dy'],config['dz'],config['Ix'],config['Iy'],config['Iz'])
     if(model_type=='DeepONet'):
+        #利用无相位无旋转的field_manager计算磁场，作为评估指标
         temp_final1=field.field_manager(model.probes_pos,field.order,field.order,[0,0,0],Btype,'I',config['radius1'],config['radius2'],config['a'],config['b'],config['dx'],config['dy'],config['dz'],config['Ix'],config['Iy'],config['Iz'])
         B=np.ravel(temp_final1)
         B=(B-mean_Bdata)/std_Bdata
@@ -66,7 +69,7 @@ def Eval(model, config, field):
             temp=field.field_manager(pos1,field.order,field.order,[0,0,0],Btype,'I')
             for j in range(3):
                 data[:,:,3*i+j]=np.reshape(temp[:,j],(model.n,model.n))
-        
+        #由于没有经过完善的包装所以标准化和去标准化要在这里进行
         data=(data-mean_Bdata)/std_Bdata
         inputs=(inputs-mean_posdata)/std_posdata
         data=torch.tensor(data,dtype=torch.float32)

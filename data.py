@@ -5,8 +5,12 @@ class Data_Generator():
     def __init__(self,config):
         self.l=config['length']/2
         self.n=config['N']
+        #order是指使用laplace方程解的阶数，只有在cubic,cylinder,sphirical三个模式下有效
         self.order=config['order']
         self.sample=config['sample']
+        #以下是几何参数，只在circle,rectangle,reccirc模式下有效
+        #circle模式下radius1是圆的半径,dz是两圆的距离，rectangle模式下a是x轴长度，b是y轴长度，dz是两圆的距离。其他几何参数没有使用
+        #reccirc模式下所有几何参数均有使用，三个电流也有使用，与pinn相同
         self.dx=config['dx']
         self.dy=config['dy']
         self.dz=config['dz']
@@ -17,17 +21,25 @@ class Data_Generator():
         self.Ix=config['Ix']
         self.Iy=config['Iy']
         self.Iz=config['Iz']
+        #rotation_list是指在field_manager中使用的旋转方式
+        #rotation_on是指是否使用旋转方式
         if(config['rotation_on']):
             self.rotation_list=['I','x','y','z']
         else:
             self.rotation_list=['I']
+        #为了省几个参数，order_on和phase_on在选择前三种和后三种磁场配置时有不同的作用
+        #order_on在使用前三种磁场配置时是指是否使用不同的阶数，若开启则磁场配置会包含从0-order的阶数，若关闭则只会有order阶的磁场
+        #在使用后三种磁场配置时，是指几何参数的波动范围，设为0则磁场配置全部使用一样的几何参数，不为0则所有几何参数都在正负order_on的范围内均匀取值
         if(config['order_on'] and (not config['order_on']%1)):
             self.order_list=np.arange(config['order'])
         else:
             self.order_list=np.array([1])*config['order']
         self.order_on=config['order_on']
+        #phase类似于order，在laplace方程的解中允许包含相位参数，在使用前三种磁场配置时若开启则磁场配置会包含从0到2*pi的相位，若关闭则只会有0相位的磁场
+        #在使用reccirc磁场配置时是指电流的波动范围，设为0则磁场配置全部使用相同电流，不为0则所有电流都在正负phase_on的范围内均匀取值
         self.phase_on=config['phase_on']  
         self.rotation_on=config['rotation_on']
+        #共有几组磁场配置
         self.sets=config['sets']
     def pos_generation(self):
         x=np.linspace(-self.l,self.l,self.n)
@@ -37,13 +49,15 @@ class Data_Generator():
         Y=np.ravel(Y)
         Z=np.ones(np.size(X))*self.l
         pos=np.transpose(np.array([X,Y]))
+        #通过insert函数生成六个表面上的探测器坐标，代码简短快速，和pinn内的显式设定等价
         for i in range(6):
             if(i==0):
                 pos1=np.insert(pos,i//2,Z*(-1)**(i),axis=1)
             else:
                 pos1=np.concatenate((pos1,np.insert(pos,i//2,Z*(-1)**(i),axis=1)),axis=0)
-
         return pos1
+    #以下三个解的内容均来自于laplace方程的解，分别对应于cubic,cylinder,spherical三种模式，具体自行参考数学物理方程
+    # 每个解都有ij两个阶数和phase三个相位参数，阶数正如角量子数和磁量子数一样。通常j<i。
     def cubic_field(self,pos,i,j,phase):
         Bx=i*np.pi*np.cos(i*pos[:,0]*np.pi+phase[0])*np.sin(j*pos[:,1]*np.pi+phase[1])*np.sinh(np.sqrt(i**2+j**2)*pos[:,2]*np.pi+phase[2])
         By=j*np.pi*np.sin(i*pos[:,0]*np.pi+phase[0])*np.cos(j*pos[:,1]*np.pi+phase[1])*np.sinh(np.sqrt(i**2+j**2)*pos[:,2]*np.pi+phase[2])
@@ -72,6 +86,7 @@ class Data_Generator():
         Bz=Br*np.cos(theta)-Btheta*np.sin(theta)
         B=np.transpose(np.array([Bx,By,Bz]))
         return B
+    #以下内容与pinn基本相同，同样定义了可以任意旋转的磁场
     def circB_xy(self,pos,radius):
         x_prime=pos[:,0]
         y_prime=pos[:,1]
@@ -144,6 +159,7 @@ class Data_Generator():
         field += self.recB_xy(pos1,a,b)*Iz
         return field
     def field_manager(self,pos,i,j,phase,mode,rotation,radius1,radius2,a,b,dx,dy,dz,Ix,Iy,Iz):
+        #field_manager将完成上述基础函数的旋转，平移和组合。例如上述函数的都只计算单个在原点的线圈的磁场，这里将两个线圈上下平移后才能构成亥姆霍兹线圈。
         pos1=pos.copy()
         if(rotation=='x'):
             pos1[:,1]=pos[:,2]
@@ -204,14 +220,20 @@ class Data_Generator():
             Iy=np.random.uniform(self.Iy - self.phase_on, self.Iy + self.phase_on)
             Iz=np.random.uniform(self.Iz - self.phase_on, self.Iz + self.phase_on)
             y=np.random.uniform(-self.l,self.l,(self.sample,3))
+            #随机选择旋转方式和阶数
             rotation=np.random.choice(self.rotation_list)
             random_order_i = np.random.choice(self.order_list)
             random_order_j = np.random.choice(self.order_list)   
+            #调用field_manager计算磁场，注意传入的参数不会被全部使用
             data[i,:]=np.ravel(self.field_manager(pos, random_order_i, random_order_j, phase, mode, rotation, radius1, radius2, a, b, dx, dy, dz, Ix, Iy, Iz))
             y_data[:,:,i]=y
             y_B_data[:,:,i]=self.field_manager(y,random_order_i,random_order_j,phase,mode,rotation,radius1,radius2,a,b,dx,dy,dz,Ix,Iy,Iz)
         return data,y_data,y_B_data
     def meshgrid_generation(self,mode):
+        # 这个函数生成用于conv模型的网格数据，顺序为(height, width,channel,batch)
+        # 不推荐这样的实践，推荐的顺序为(batch, channel,height,width)
+        # 因为线性索引变化最快的维度是最后一个维度，使用推荐的顺序可以确保在reshape后不同batch的数据不会混淆
+        # 后续有意愿的话可进行修改
         x=np.linspace(-self.l,self.l,self.n)
         y=np.linspace(-self.l,self.l,self.n)
         data=np.zeros((self.n,self.n,18,self.order**2*4))
