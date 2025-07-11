@@ -5,7 +5,7 @@ from eval import *
 from utils import *
 import argparse
 import json
-#deeponet程序基本上是基于PINN程序修改的，除了model模块完全重写,目前只支持模拟数据
+#deeponet程序基本上是基于PINN程序修改的，除了model模块完全重写,data模块增加多种函数。目前只支持模拟数据
 #相较于PINN，deeponet这边能够生成更多种模拟数据，包括三角函数，贝塞尔函数，球谐函数，亥姆霍兹圆线圈，亥姆霍兹方线圈，两圆一方
 #deeponet结构和论文内的相同，linear采用线性层，conv采用卷积层，推荐使用linear
 #标准化函数

@@ -51,7 +51,7 @@ class DeepONet_Linear(nn.Module):
         trunk_output = self.trunk(trunk_input)
         # 将 branch_output 和 trunk_output 拼接在一起
         #combined_output = torch.cat((branch_output.repeat(trunk_output.size()[0],1), trunk_output), dim=1)
-        #同样为其添加维度
+        #为了避免一维数组不能与二维相乘，为其添加维度
         if(len(branch_output.shape)<=1):
             combined_output = torch.mul(branch_output.unsqueeze(0), trunk_output)
         else:
@@ -66,7 +66,7 @@ class DeepONet_Conv(nn.Module):
         self.probes_pos=probes_pos
         super(DeepONet_Conv, self).__init__()
         #branch网络输入可以是四维数组(batch,channel,height,width)，3个方向6个面共18个通道，每个通道都是一个面均匀分布的探测器上某个方向的磁场
-        #但实际上因为函数train_data_generation的处理，输入是一个三维数组，第一二维是点位数目，第三维是每个点位在三个方向六个面上的磁场数据
+        #但实际上因为函数train_data_generation的处理，输入是一个三维数组，第一二维是点位数目，第三维是每个点位在三个方向六个面上的磁场数据，即(height,width,channel)
         self.branch = nn.Sequential(
             nn.Conv2d(18, units, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -115,7 +115,7 @@ class DeepONet_Conv(nn.Module):
 
     def forward(self,branch_input,trunk_input):
         #由于没有采用(batch,channel,height,width)的顺序，所以需要对branch_input进行转置和增加维度
-        #建议日后的编程实践都采用这种顺序
+        #建议日后的编程实践改为采用这种顺序
         branch_output = self.branch(branch_input.permute(2,0,1).unsqueeze(0))
         trunk_output = self.trunk(trunk_input)
         # 将 branch_output 和 trunk_output 拼接在一起
